@@ -1,1 +1,55 @@
-name: CI Workflow
+name: Build and Publish npm Package to JFrog Artifactory
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Step 3: Install and configure JFrog CLI
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ secrets.JF_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+
+      # Step 4: Configure npm resolution and deployment repositories
+      - name: Configure JFrog npm repositories
+        run: |
+          jf npmc --repo-resolve=${{ vars.JF_NPM_RESOLVE_REPO }} \
+                   --repo-deploy=${{ vars.JF_NPM_DEPLOY_REPO }}
+
+      # Step 5: Install dependencies (Resolving from Artifactory)
+      - name: Install npm Dependencies
+        run: jf npm install
+
+      # Step 6: Build project (Optional - uncomment if you have a build step)
+      # - name: Build Package
+      #   run: npm run build
+
+      # Step 7: Publish npm package to Artifactory
+      - name: Publish npm Package
+        run: jf npm publish
+
+      # Step 8: Collect and publish build information to Artifactory
+      - name: Publish Build Info
+        run: |
+          jf rt build-collect-env
+          jf rt build-add-git
+          jf rt build-publish
